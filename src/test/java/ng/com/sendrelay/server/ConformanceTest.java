@@ -75,6 +75,7 @@ class ConformanceTest {
         BINDINGS.put("tasks.availableRiders", (r, i) -> r.tasks().availableRiders(i.get("taskId").asText(), intOrNull(i.path("query").get("tier"))));
         BINDINGS.put("tasks.rate", (r, i) -> r.tasks().rate(i.get("taskId").asText(), as(i.get("body"), Tasks.RatingRequest.class)));
         BINDINGS.put("tasks.dispute", (r, i) -> r.tasks().dispute(i.get("taskId").asText(), as(i.get("body"), Tasks.DisputeRequest.class)));
+        BINDINGS.put("tasks.simulateAdvance", (r, i) -> r.tasks().simulateAdvance(i.get("taskId").asText()));
         BINDINGS.put("webhooks.create", (r, i) -> r.webhooks().create(as(i.get("body"), Webhooks.CreateRequest.class)));
         BINDINGS.put("webhooks.list", (r, i) -> r.webhooks().list());
         BINDINGS.put("webhooks.get", (r, i) -> r.webhooks().get(i.get("webhookId").asText()));

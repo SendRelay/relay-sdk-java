@@ -4,7 +4,7 @@ The official server SDK for [Relay](https://sendrelay.com.ng), the delivery API,
 
 ```kotlin
 // build.gradle.kts
-implementation("ng.com.sendrelay:relay-java:1.7.0")
+implementation("ng.com.sendrelay:relay-java:1.8.0")
 ```
 
 Java 17 or newer. Depends on Jackson. For apps (Android), use `ng.com.sendrelay:relay-android` instead.

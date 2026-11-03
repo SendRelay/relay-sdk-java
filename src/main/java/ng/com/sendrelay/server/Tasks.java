@@ -102,19 +102,47 @@ public final class Tasks {
         return relay.post("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/dispute", request, null, DisputeResponse.class);
     }
 
+    /**
+     * Test keys only: open a SCHEDULED task's search now instead of at its {@code searchStartsAt}, so a
+     * booking can be rehearsed without waiting for the pickup time.
+     */
+    public SimulateAdvanceResponse simulateAdvance(String taskId) {
+        return relay.post("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/simulate/advance", null, null, SimulateAdvanceResponse.class);
+    }
+
     // ── Requests ─────────────────────────────────────────────────────────────
 
-    public record Location(double latitude, double longitude, String address) {}
+    /**
+     * A place. {@code countryCode} (ISO 3166-1 alpha-2, for example "NG") and {@code postalCode} are
+     * optional and not used in pricing yet.
+     */
+    public record Location(double latitude, double longitude, String address, String countryCode, String postalCode) {
+        public Location(double latitude, double longitude, String address) {
+            this(latitude, longitude, address, null, null);
+        }
+    }
 
+    /** A parcel. {@code reference} is your own id for it, optional, so it can be followed across legs later. */
     public record Item(
             String name,
             String description,
             long estimatedValue,
             String estimatedWeight,
             String estimatedSize,
-            String specialInstructions) {
+            String specialInstructions,
+            String reference) {
+        public Item(
+                String name,
+                String description,
+                long estimatedValue,
+                String estimatedWeight,
+                String estimatedSize,
+                String specialInstructions) {
+            this(name, description, estimatedValue, estimatedWeight, estimatedSize, specialInstructions, null);
+        }
+
         public Item(String name, long estimatedValue, String estimatedWeight, String estimatedSize) {
-            this(name, null, estimatedValue, estimatedWeight, estimatedSize, null);
+            this(name, null, estimatedValue, estimatedWeight, estimatedSize, null, null);
         }
     }
 
@@ -153,9 +181,42 @@ public final class Tasks {
     /** Proof of delivery: set {@code code} to choose the digits, or {@code length} (4 or 6) to have Relay generate them. */
     public record CompletionCodeRequest(String code, Integer length) {}
 
-    public record QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences) {
+    /**
+     * When Relay looks for a rider; leave it null for IMMEDIATE. Part of the quote lock. Build it with
+     * {@link #immediate()}, {@link #waitForRider(int)} or {@link #scheduled(String, Integer)}.
+     */
+    public record DispatchRequest(String strategy, Integer maxWaitMinutes, String pickupAt, Integer pickupWindowMinutes) {
+        /** Offer to nearby riders now (about two minutes). */
+        public static DispatchRequest immediate() {
+            return new DispatchRequest("IMMEDIATE", null, null, null);
+        }
+
+        /** Then keep offering as riders come online nearby, for 5–720 minutes (food 5–45). */
+        public static DispatchRequest waitForRider(int maxWaitMinutes) {
+            return new DispatchRequest("WAIT_FOR_RIDER", maxWaitMinutes, null, null);
+        }
+
+        /**
+         * Book for {@code pickupAt} (ISO 8601 with an offset), 45 minutes to 7 days ahead, priced for then
+         * and held now. {@code pickupWindowMinutes} may be null (30); at most 120.
+         */
+        public static DispatchRequest scheduled(String pickupAt, Integer pickupWindowMinutes) {
+            return new DispatchRequest("SCHEDULED", null, pickupAt, pickupWindowMinutes);
+        }
+    }
+
+    public record QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch) {
+        public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences) {
+            this(taskType, priority, stages, preferences, null);
+        }
+
         public QuoteRequest(String taskType, List<Stage> stages) {
-            this(taskType, null, stages, null);
+            this(taskType, null, stages, null, null);
+        }
+
+        /** The same request, with a dispatch strategy. */
+        public QuoteRequest withDispatch(DispatchRequest value) {
+            return new QuoteRequest(taskType, priority, stages, preferences, value);
         }
     }
 
@@ -170,19 +231,43 @@ public final class Tasks {
             String quoteId,
             Preferences preferences,
             CompletionCodeRequest completionCode,
-            String simulationOutcome) {
+            String simulationOutcome,
+            DispatchRequest dispatch) {
+        public CreateRequest(
+                String taskType,
+                String priority,
+                List<Stage> stages,
+                Boolean autoAssign,
+                String paymentMethod,
+                String notes,
+                String externalId,
+                String quoteId,
+                Preferences preferences,
+                CompletionCodeRequest completionCode,
+                String simulationOutcome) {
+            this(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, null);
+        }
+
         public CreateRequest(String taskType, List<Stage> stages) {
-            this(taskType, null, stages, null, null, null, null, null, null, null, null);
+            this(taskType, null, stages, null, null, null, null, null, null, null, null, null);
         }
 
         /** The same request, priced by a quote you got earlier. */
         public CreateRequest withQuoteId(String id) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch);
         }
 
-        /** The same request, for a test key: how the simulated delivery plays out (SUCCESS, NO_RIDERS, ...). */
+        /**
+         * The same request, for a test key: how the simulated delivery plays out (SUCCESS, NO_RIDERS, ...).
+         * SEARCH_THEN_ASSIGNED and SEARCH_EXPIRED need WAIT_FOR_RIDER or SCHEDULED.
+         */
         public CreateRequest withSimulationOutcome(String outcome) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch);
+        }
+
+        /** The same request, with a dispatch strategy (send the same one you quoted). */
+        public CreateRequest withDispatch(DispatchRequest value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value);
         }
     }
 
@@ -261,7 +346,25 @@ public final class Tasks {
             boolean completionCodeRequired,
             Integer completionCodeLength,
             CompletionCode completionCode,
-            Rider rider) {}
+            Rider rider,
+            /* When Relay looks for a rider, and for how long. */
+            Dispatch dispatch) {}
+
+    /**
+     * The dispatch block on every task. {@code strategy} is IMMEDIATE, WAIT_FOR_RIDER or SCHEDULED, or a
+     * newer one as its raw string. {@code searchExpiresAt} is null for IMMEDIATE.
+     */
+    public record Dispatch(
+            String strategy,
+            Integer maxWaitMinutes,
+            String pickupAt,
+            Integer pickupWindowMinutes,
+            String searchStartsAt,
+            String searchExpiresAt,
+            int offerRounds) {}
+
+    /** The reply to {@link #simulateAdvance}: still SCHEDULED; the task moves to PENDING within seconds. */
+    public record SimulateAdvanceResponse(String message, String taskId, String status, String searchStartsAt, String searchExpiresAt) {}
 
     /** How far the rider is from the stop they are heading to, from their navigation route and live traffic. */
     public record LiveEta(int stageIndex, int seconds, int meters, String arrivesAt, String updatedAt) {}
