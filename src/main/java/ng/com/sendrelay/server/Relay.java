@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 public final class Relay {
     /** The published SDK version. Kept in sync with gradle.properties by scripts/check-sdk-versions.mjs. */
-    public static final String VERSION = "1.8.0";
+    public static final String VERSION = "1.9.0";
 
     public static final String DEFAULT_BASE_URL = "https://api.sendrelay.com.ng";
     public static final String DEFAULT_API_VERSION = "v1";

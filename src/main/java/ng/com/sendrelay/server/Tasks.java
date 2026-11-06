@@ -205,18 +205,30 @@ public final class Tasks {
         }
     }
 
-    public record QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch) {
+    public record QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured) {
+        public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch) {
+            this(taskType, priority, stages, preferences, dispatch, null);
+        }
+
         public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences) {
-            this(taskType, priority, stages, preferences, null);
+            this(taskType, priority, stages, preferences, null, null);
         }
 
         public QuoteRequest(String taskType, List<Stage> stages) {
-            this(taskType, null, stages, null, null);
+            this(taskType, null, stages, null, null, null);
         }
 
         /** The same request, with a dispatch strategy. */
         public QuoteRequest withDispatch(DispatchRequest value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, value);
+            return new QuoteRequest(taskType, priority, stages, preferences, value, insured);
+        }
+
+        /**
+         * The same request with insurance on the items' declared values turned on or off. It is on by
+         * default; {@code false} means no premium, and loss or damage is not covered.
+         */
+        public QuoteRequest withInsured(boolean value) {
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, value);
         }
     }
 
@@ -232,7 +244,24 @@ public final class Tasks {
             Preferences preferences,
             CompletionCodeRequest completionCode,
             String simulationOutcome,
-            DispatchRequest dispatch) {
+            DispatchRequest dispatch,
+            Boolean insured) {
+        public CreateRequest(
+                String taskType,
+                String priority,
+                List<Stage> stages,
+                Boolean autoAssign,
+                String paymentMethod,
+                String notes,
+                String externalId,
+                String quoteId,
+                Preferences preferences,
+                CompletionCodeRequest completionCode,
+                String simulationOutcome,
+                DispatchRequest dispatch) {
+            this(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, null);
+        }
+
         public CreateRequest(
                 String taskType,
                 String priority,
@@ -249,12 +278,12 @@ public final class Tasks {
         }
 
         public CreateRequest(String taskType, List<Stage> stages) {
-            this(taskType, null, stages, null, null, null, null, null, null, null, null, null);
+            this(taskType, null, stages, null, null, null, null, null, null, null, null, null, null);
         }
 
         /** The same request, priced by a quote you got earlier. */
         public CreateRequest withQuoteId(String id) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured);
         }
 
         /**
@@ -262,12 +291,21 @@ public final class Tasks {
          * SEARCH_THEN_ASSIGNED and SEARCH_EXPIRED need WAIT_FOR_RIDER or SCHEDULED.
          */
         public CreateRequest withSimulationOutcome(String outcome) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured);
         }
 
         /** The same request, with a dispatch strategy (send the same one you quoted). */
         public CreateRequest withDispatch(DispatchRequest value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value, insured);
+        }
+
+        /**
+         * The same request with insurance on the items' declared values turned on or off. It is on by
+         * default; {@code false} means no premium, and loss or damage is not covered. Send the same
+         * value you quoted.
+         */
+        public CreateRequest withInsured(boolean value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, value);
         }
     }
 
@@ -383,7 +421,7 @@ public final class Tasks {
      * A price. {@link #lines()} has every fee line as the API sent it, including ones not named here
      * (insuranceFee, temporalFee, ...).
      */
-    public record Pricing(long total, long subtotal, long tax, long platformFee, long priorityFee, JsonNode lines) {
+    public record Pricing(long total, long subtotal, long tax, long platformFee, long priorityFee, long insuranceFee, long insuredValue, JsonNode lines) {
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
         static Pricing from(JsonNode node) {
             return new Pricing(
@@ -392,6 +430,8 @@ public final class Tasks {
                     node.path("tax").asLong(),
                     node.path("platformFee").asLong(),
                     node.path("priorityFee").asLong(),
+                    node.path("insuranceFee").asLong(),
+                    node.path("insuredValue").asLong(),
                     node);
         }
 
@@ -407,6 +447,8 @@ public final class Tasks {
             long tax,
             long platformFee,
             long priorityFee,
+            long insuranceFee,
+            long insuredValue,
             String pricingVehicleType,
             String quoteId,
             String expiresAt,
