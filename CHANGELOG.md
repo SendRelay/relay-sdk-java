@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0 — 2026-11-08
+
+- `relay.events().list()` and `listAll()`: the event log, every event for your account and mode, kept for 30 days. `types` filters by event type.
+- `relay.tasks().events(taskId)`: every event about one task, oldest first.
+- `relay.claims()`: insurance claims on a task, for insured goods lost, stolen or damaged after collection. `get`, `createUpload` (a URL to PUT one photo or PDF to), `file`, `respond` and `withdraw`. Live keys only.
+- `relay.webhooks().redeliver(webhookId, new Webhooks.RedeliverRequest(eventId))`: send a logged event to an endpoint again, with the same id.
+- `updatedSince` on `Tasks.ListParams` (a new four-argument constructor; the three-argument one still works): tasks changed since a time, in `updatedAt` order, for reconciliation jobs.
+- `revision()` and `currency()` on `Task` and `TaskListItem`. Task events carry `data.revision`: apply an event only if it is higher than the revision you stored.
+- `tasks().update(...)` and `tasks().trackingLink(...)`. `Stage` gains `contact`, `deliverItems`, `completionCode`, `completionCodeLength`, `arrivedAt` and `waitSeconds` (`withContact`, `withDeliverItems`, `withCompletionCode`); `DispatchRequest.withReadyAt` and `withOnRiderCancel`; `CreateRequest.withRequirePhoto`. Every earlier constructor still works.
+
 ## 1.9.0 — 2026-11-06
 
 - Insurance on tasks: `withInsured(false)` on `CreateRequest` and `QuoteRequest` turns it off for that task. It is on by default.

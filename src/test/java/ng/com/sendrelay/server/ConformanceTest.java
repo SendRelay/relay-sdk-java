@@ -90,10 +90,33 @@ class ConformanceTest {
             JsonNode q = i.get("query");
             return r.presence().get(q.get("latitude").asDouble(), q.get("longitude").asDouble(), textOrNull(q.get("resolution")));
         });
+        BINDINGS.put("tasks.events", (r, i) -> r.tasks().events(i.get("taskId").asText()));
+        BINDINGS.put("tasks.update", (r, i) -> r.tasks().update(i.get("taskId").asText(), as(i.get("body"), Tasks.UpdateRequest.class)));
+        BINDINGS.put("tasks.trackingLink", (r, i) -> r.tasks().trackingLink(i.get("taskId").asText(),
+                i.hasNonNull("body") ? as(i.get("body"), Tasks.TrackingLinkRequest.class) : null));
+        BINDINGS.put("events.list", (r, i) -> r.events().list(eventParams(i.path("query"))));
+        BINDINGS.put("events.listAll", (r, i) -> {
+            List<String> ids = new ArrayList<>();
+            for (Events.Event event : r.events().listAll(eventParams(i.path("query")))) ids.add(event.id());
+            return ids;
+        });
+        BINDINGS.put("webhooks.redeliver", (r, i) -> r.webhooks().redeliver(i.get("webhookId").asText(), as(i.get("body"), Webhooks.RedeliverRequest.class)));
+        BINDINGS.put("claims.get", (r, i) -> r.claims().get(i.get("taskId").asText()));
+        BINDINGS.put("claims.createUpload", (r, i) -> r.claims().createUpload(i.get("taskId").asText(), as(i.get("body"), Claims.CreateUploadRequest.class)));
+        BINDINGS.put("claims.file", (r, i) -> r.claims().file(i.get("taskId").asText(), as(i.get("body"), Claims.FileRequest.class)));
+        BINDINGS.put("claims.respond", (r, i) -> r.claims().respond(i.get("taskId").asText(), as(i.get("body"), Claims.RespondRequest.class)));
+        BINDINGS.put("claims.withdraw", (r, i) -> r.claims().withdraw(i.get("taskId").asText()));
+    }
+
+    private static Events.ListParams eventParams(JsonNode q) {
+        List<String> types = new ArrayList<>();
+        q.path("types").forEach(t -> types.add(t.asText()));
+        return new Events.ListParams(intOrNull(q.get("limit")), textOrNull(q.get("order")), textOrNull(q.get("cursor")),
+                types.isEmpty() ? null : types);
     }
 
     private static Tasks.ListParams listParams(JsonNode q) {
-        return new Tasks.ListParams(intOrNull(q.get("limit")), textOrNull(q.get("order")), textOrNull(q.get("cursor")));
+        return new Tasks.ListParams(intOrNull(q.get("limit")), textOrNull(q.get("order")), textOrNull(q.get("cursor")), textOrNull(q.get("updatedSince")));
     }
 
     private static JsonNode lookup(JsonNode node, String dotted) {

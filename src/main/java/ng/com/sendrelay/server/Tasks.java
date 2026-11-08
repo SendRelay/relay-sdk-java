@@ -45,7 +45,7 @@ public final class Tasks {
 
     /** Every task, fetched page by page as you iterate. */
     public Iterable<TaskListItem> listAll(ListParams params) {
-        ListParams first = params == null ? new ListParams(null, null, null) : params;
+        ListParams first = params == null ? new ListParams(null, null, null, null) : params;
         return () -> new Iterator<>() {
             private Iterator<TaskListItem> page = List.<TaskListItem>of().iterator();
             private String cursor = first.cursor();
@@ -54,7 +54,7 @@ public final class Tasks {
             @Override
             public boolean hasNext() {
                 while (!page.hasNext() && more) {
-                    ListResponse response = list(new ListParams(first.limit(), first.order(), cursor));
+                    ListResponse response = list(new ListParams(first.limit(), first.order(), cursor, first.updatedSince()));
                     page = response.data().iterator();
                     cursor = response.cursor();
                     more = response.hasMore() && cursor != null && !cursor.isEmpty();
@@ -68,6 +68,28 @@ public final class Tasks {
                 return page.next();
             }
         };
+    }
+
+    /**
+     * Change notes, externalId, or a stop's instructions and contact until that stop is completed.
+     * Anything affecting price or dispatch is refused with FIELD_NOT_EDITABLE.
+     */
+    public UpdateResponse update(String taskId, UpdateRequest request) {
+        return relay.patch("/sdk/tasks/" + Relay.pathId("taskId", taskId), request, UpdateResponse.class);
+    }
+
+    /** A hosted tracking page to send your customer; {@code request} may be null, or limit it to one DROPOFF. */
+    public TrackingLinkResponse trackingLink(String taskId, TrackingLinkRequest request) {
+        return relay.post(
+                "/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/tracking-link",
+                request == null ? new TrackingLinkRequest(null) : request,
+                null,
+                TrackingLinkResponse.class);
+    }
+
+    /** Every event about a task, oldest first, each with its {@code data.revision}. */
+    public EventsResponse events(String taskId) {
+        return relay.get("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/events", null, EventsResponse.class);
     }
 
     /** A task, your rating of it, and the rider's live ETA while they are on the way. */
@@ -149,6 +171,12 @@ public final class Tasks {
     public record Passenger(String name, String contactInfo, String specialNeeds, Integer luggageCount) {}
 
     /** A stop. On requests set type, location, instructions and items (or passengers); responses fill in progress. */
+    /**
+     * A stop. The last six components are newer: {@code contact} (who to call), {@code deliverItems}
+     * (DROPOFF: item references handed over here), {@code completionCode} (a code the rider must enter
+     * here; on create and get, the stop's code), and on responses {@code completionCodeLength},
+     * {@code arrivedAt} and {@code waitSeconds}. The nine-argument constructor still works.
+     */
     public record Stage(
             String type,
             Location location,
@@ -158,7 +186,41 @@ public final class Tasks {
             String status,
             String completedAt,
             String completionPhoto,
-            String completionNotes) {
+            String completionNotes,
+            StageContact contact,
+            List<String> deliverItems,
+            StageCompletionCode completionCode,
+            Integer completionCodeLength,
+            String arrivedAt,
+            Integer waitSeconds) {
+        public Stage(
+                String type,
+                Location location,
+                String instructions,
+                List<Item> items,
+                List<Passenger> passengers,
+                String status,
+                String completedAt,
+                String completionPhoto,
+                String completionNotes) {
+            this(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, null, null, null, null, null, null);
+        }
+
+        /** The same stop with someone to call there. */
+        public Stage withContact(StageContact value) {
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, value, deliverItems, completionCode, completionCodeLength, arrivedAt, waitSeconds);
+        }
+
+        /** The same DROPOFF, handing over these item references. */
+        public Stage withDeliverItems(List<String> value) {
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, value, completionCode, completionCodeLength, arrivedAt, waitSeconds);
+        }
+
+        /** The same stop, needing a code: {@code new StageCompletionCode("4821", null)} or {@code (null, 4)}. */
+        public Stage withCompletionCode(StageCompletionCode value) {
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, deliverItems, value, completionCodeLength, arrivedAt, waitSeconds);
+        }
+
         public static Stage pickup(Location location, String instructions, List<Item> items) {
             return new Stage("PICKUP", location, instructions, items, null, null, null, null, null);
         }
@@ -181,11 +243,40 @@ public final class Tasks {
     /** Proof of delivery: set {@code code} to choose the digits, or {@code length} (4 or 6) to have Relay generate them. */
     public record CompletionCodeRequest(String code, Integer length) {}
 
+    /** Who to call at a stop. */
+    public record StageContact(String name, String phone) {}
+
+    /** A stop's code: {@code code} or {@code length} on a request; every field on a response. */
+    public record StageCompletionCode(
+            String code, Integer length, String source, String status, Integer failedAttempts, String lockedUntil, String verifiedAt) {
+        public StageCompletionCode(String code, Integer length) {
+            this(code, length, null, null, null, null, null);
+        }
+    }
+
     /**
      * When Relay looks for a rider; leave it null for IMMEDIATE. Part of the quote lock. Build it with
      * {@link #immediate()}, {@link #waitForRider(int)} or {@link #scheduled(String, Integer)}.
      */
-    public record DispatchRequest(String strategy, Integer maxWaitMinutes, String pickupAt, Integer pickupWindowMinutes) {
+    public record DispatchRequest(
+            String strategy, Integer maxWaitMinutes, String pickupAt, Integer pickupWindowMinutes, String readyAt, String onRiderCancel) {
+        public DispatchRequest(String strategy, Integer maxWaitMinutes, String pickupAt, Integer pickupWindowMinutes) {
+            this(strategy, maxWaitMinutes, pickupAt, pickupWindowMinutes, null, null);
+        }
+
+        /**
+         * IMMEDIATE and WAIT_FOR_RIDER: when the pickup will be ready (ISO 8601, at most 45 minutes
+         * ahead). The search opens in time to arrive then; the task waits as SCHEDULED until it does.
+         */
+        public DispatchRequest withReadyAt(String value) {
+            return new DispatchRequest(strategy, maxWaitMinutes, pickupAt, pickupWindowMinutes, value, onRiderCancel);
+        }
+
+        /** "CANCEL" (default: the task ends, refunded) or "FIND_ANOTHER" (look again, at most twice; needs autoAssign). */
+        public DispatchRequest withOnRiderCancel(String value) {
+            return new DispatchRequest(strategy, maxWaitMinutes, pickupAt, pickupWindowMinutes, readyAt, value);
+        }
+
         /** Offer to nearby riders now (about two minutes). */
         public static DispatchRequest immediate() {
             return new DispatchRequest("IMMEDIATE", null, null, null);
@@ -245,7 +336,31 @@ public final class Tasks {
             CompletionCodeRequest completionCode,
             String simulationOutcome,
             DispatchRequest dispatch,
-            Boolean insured) {
+            Boolean insured,
+            /* A completion photo at every DROPOFF; null for the default (no). */
+            Boolean requirePhoto) {
+        public CreateRequest(
+                String taskType,
+                String priority,
+                List<Stage> stages,
+                Boolean autoAssign,
+                String paymentMethod,
+                String notes,
+                String externalId,
+                String quoteId,
+                Preferences preferences,
+                CompletionCodeRequest completionCode,
+                String simulationOutcome,
+                DispatchRequest dispatch,
+                Boolean insured) {
+            this(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, null);
+        }
+
+        /** The same request, asking for a completion photo at every DROPOFF. */
+        public CreateRequest withRequirePhoto(boolean value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, value);
+        }
+
         public CreateRequest(
                 String taskType,
                 String priority,
@@ -283,7 +398,7 @@ public final class Tasks {
 
         /** The same request, priced by a quote you got earlier. */
         public CreateRequest withQuoteId(String id) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto);
         }
 
         /**
@@ -291,7 +406,7 @@ public final class Tasks {
          * SEARCH_THEN_ASSIGNED and SEARCH_EXPIRED need WAIT_FOR_RIDER or SCHEDULED.
          */
         public CreateRequest withSimulationOutcome(String outcome) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured, requirePhoto);
         }
 
         /** The same request, with a dispatch strategy (send the same one you quoted). */
@@ -309,13 +424,22 @@ public final class Tasks {
         }
     }
 
-    /** Filters for {@link #list}. Any may be null. {@code order} is "asc" or "desc" (default). */
-    public record ListParams(Integer limit, String order, String cursor) {
+    /**
+     * Filters for {@link #list}. Any may be null. {@code order} is "asc" or "desc" (default).
+     * {@code updatedSince} (ISO 8601) lists only tasks changed at or after that time, in
+     * {@code updatedAt} order: for reconciliation, walk forward with "asc".
+     */
+    public record ListParams(Integer limit, String order, String cursor, String updatedSince) {
+        public ListParams(Integer limit, String order, String cursor) {
+            this(limit, order, cursor, null);
+        }
+
         Map<String, Object> toQuery() {
             Map<String, Object> query = new LinkedHashMap<>();
             query.put("limit", limit);
             query.put("order", order);
             query.put("cursor", cursor);
+            query.put("updatedSince", updatedSince);
             return query;
         }
     }
@@ -386,7 +510,13 @@ public final class Tasks {
             CompletionCode completionCode,
             Rider rider,
             /* When Relay looks for a rider, and for how long. */
-            Dispatch dispatch) {}
+            Dispatch dispatch,
+            /* Goes up with every event about the task and matches events' data.revision; 0 before the first. */
+            int revision,
+            /* Currency of every amount, in minor units (kobo for NGN). */
+            String currency,
+            /* A completion photo is required at every DROPOFF. */
+            boolean requirePhoto) {}
 
     /**
      * The dispatch block on every task. {@code strategy} is IMMEDIATE, WAIT_FOR_RIDER or SCHEDULED, or a
@@ -399,7 +529,9 @@ public final class Tasks {
             Integer pickupWindowMinutes,
             String searchStartsAt,
             String searchExpiresAt,
-            int offerRounds) {}
+            int offerRounds,
+            String readyAt,
+            String onRiderCancel) {}
 
     /** The reply to {@link #simulateAdvance}: still SCHEDULED; the task moves to PENDING within seconds. */
     public record SimulateAdvanceResponse(String message, String taskId, String status, String searchStartsAt, String searchExpiresAt) {}
@@ -471,9 +603,26 @@ public final class Tasks {
             long totalFee,
             String createdAt,
             boolean completionCodeRequired,
-            Integer completionCodeLength) {}
+            Integer completionCodeLength,
+            String updatedAt,
+            int revision,
+            String currency) {}
 
     public record ListResponse(List<TaskListItem> data, boolean hasMore, String cursor) {}
+
+    /** Every event about one task, oldest first. */
+    public record EventsResponse(List<Events.Event> data) {}
+
+    /** What {@link #update} may change. {@code contact} null on a stage leaves it unchanged. */
+    public record UpdateRequest(String notes, String externalId, List<UpdateStage> stages) {}
+
+    public record UpdateStage(int index, String instructions, StageContact contact) {}
+
+    public record UpdateResponse(Task task) {}
+
+    public record TrackingLinkRequest(Integer stageIndex) {}
+
+    public record TrackingLinkResponse(String url, String expiresAt, Integer stageIndex) {}
 
     public record CancelResponse(String message, String taskId, String status) {}
 

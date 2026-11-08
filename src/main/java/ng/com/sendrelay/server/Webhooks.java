@@ -45,6 +45,11 @@ public final class Webhooks {
         return relay.delete("/sdk/webhooks/" + Relay.pathId("webhookId", webhookId), null, Webhook.class);
     }
 
+    /** Sends a logged event to this endpoint again, with the same event id, so your dedupe still applies. */
+    public RedeliverResponse redeliver(String webhookId, RedeliverRequest request) {
+        return relay.post("/sdk/webhooks/" + Relay.pathId("webhookId", webhookId) + "/redeliver", request, null, RedeliverResponse.class);
+    }
+
     /**
      * Check that a delivery came from Relay and wasn't changed on the way. Pass the raw request body
      * exactly as received, the {@code X-Relay-Signature} header and the {@code whsec_} secret.
@@ -106,4 +111,8 @@ public final class Webhooks {
     public record CreateResponse(String id, String url, String mode, List<String> events, String secret) {}
 
     public record ListResponse(List<Webhook> data, boolean hasMore, String cursor) {}
+
+    public record RedeliverRequest(String eventId) {}
+
+    public record RedeliverResponse(String webhookId, String eventId, boolean queued) {}
 }

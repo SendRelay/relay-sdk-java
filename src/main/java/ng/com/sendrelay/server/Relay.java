@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 public final class Relay {
     /** The published SDK version. Kept in sync with gradle.properties by scripts/check-sdk-versions.mjs. */
-    public static final String VERSION = "1.9.0";
+    public static final String VERSION = "1.10.0";
 
     public static final String DEFAULT_BASE_URL = "https://api.sendrelay.com.ng";
     public static final String DEFAULT_API_VERSION = "v1";
@@ -63,6 +63,8 @@ public final class Relay {
     private final Webhooks webhooks = new Webhooks(this);
     private final Auth auth = new Auth(this);
     private final Presence presence = new Presence(this);
+    private final Events events = new Events(this);
+    private final Claims claims = new Claims(this);
 
     private Relay(Builder b) {
         this.apiKey = b.apiKey;
@@ -94,6 +96,16 @@ public final class Relay {
 
     public Presence presence() {
         return presence;
+    }
+
+    /** The event log: every event about your tasks and payments, kept for 30 days. */
+    public Events events() {
+        return events;
+    }
+
+    /** Insurance claims on a task, for insured goods lost, stolen or damaged after collection. */
+    public Claims claims() {
+        return claims;
     }
 
     /** {@code "live"} for a live key, {@code "test"} for a test key. */
@@ -207,6 +219,10 @@ public final class Relay {
 
     <T> T put(String path, Object body, Class<T> type) {
         return send("PUT", path, null, body, null, type);
+    }
+
+    <T> T patch(String path, Object body, Class<T> type) {
+        return send("PATCH", path, null, body, null, type);
     }
 
     <T> T delete(String path, Object body, Class<T> type) {
