@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.0 — 2026-11-09
+
+- `requirements` on `Tasks.Task`, `Tasks.QuoteResponse` and `Presence.Response` (`Tasks.Requirements`): each vehicle Relay looks for and the equipment a rider on it needs, for example a box on a motorcycle for food. See [the box a task needs](https://docs.sendrelay.com.ng/concepts/dispatch#the-box-a-task-needs). The records gain a last component.
+- `presence().get(latitude, longitude, resolution, filter)` with a `Presence.Filter` (`Presence.Filter.of("FOOD_DELIVERY")`, or every field: `vehicleType`, `hasBox`, `hasRefrigeration`, `hasAirConditioning`, `estimatedWeight`, `estimatedSize`) counts only riders who could take that job. The three-argument `get` is unchanged.
+
 ## 1.10.0 — 2026-11-08
 
 - `relay.events().list()` and `listAll()`: the event log, every event for your account and mode, kept for 30 days. `types` filters by event type.

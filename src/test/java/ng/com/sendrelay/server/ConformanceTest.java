@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -88,7 +89,17 @@ class ConformanceTest {
         });
         BINDINGS.put("presence.get", (r, i) -> {
             JsonNode q = i.get("query");
-            return r.presence().get(q.get("latitude").asDouble(), q.get("longitude").asDouble(), textOrNull(q.get("resolution")));
+            Presence.Filter filter = q.has("taskType")
+                    ? new Presence.Filter(
+                            q.get("taskType").asText(),
+                            q.has("vehicleType") ? JSON.convertValue(q.get("vehicleType"), new TypeReference<List<String>>() {}) : null,
+                            q.has("hasBox") ? q.get("hasBox").asBoolean() : null,
+                            q.has("hasRefrigeration") ? q.get("hasRefrigeration").asBoolean() : null,
+                            q.has("hasAirConditioning") ? q.get("hasAirConditioning").asBoolean() : null,
+                            textOrNull(q.get("estimatedWeight")),
+                            textOrNull(q.get("estimatedSize")))
+                    : null;
+            return r.presence().get(q.get("latitude").asDouble(), q.get("longitude").asDouble(), textOrNull(q.get("resolution")), filter);
         });
         BINDINGS.put("tasks.events", (r, i) -> r.tasks().events(i.get("taskId").asText()));
         BINDINGS.put("tasks.update", (r, i) -> r.tasks().update(i.get("taskId").asText(), as(i.get("body"), Tasks.UpdateRequest.class)));

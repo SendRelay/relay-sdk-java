@@ -516,7 +516,19 @@ public final class Tasks {
             /* Currency of every amount, in minor units (kobo for NGN). */
             String currency,
             /* A completion photo is required at every DROPOFF. */
-            boolean requirePhoto) {}
+            boolean requirePhoto,
+            /* The vehicles Relay looks for and the equipment a rider on each needs. */
+            Requirements requirements) {}
+
+    /**
+     * What Relay looks for in a rider: each vehicle that can take the task, with the equipment a rider
+     * on it needs (for example a box on a motorcycle for food). Every vehicle is listed when the task
+     * names none.
+     */
+    public record Requirements(List<RequirementVehicle> vehicles) {}
+
+    /** {@code equipment} holds BOX, REFRIGERATION or AIR_CONDITIONING; treat others as equipment you can't check. */
+    public record RequirementVehicle(String vehicleType, List<String> equipment) {}
 
     /**
      * The dispatch block on every task. {@code strategy} is IMMEDIATE, WAIT_FOR_RIDER or SCHEDULED, or a
@@ -585,7 +597,9 @@ public final class Tasks {
             String quoteId,
             String expiresAt,
             int quoteTtlSeconds,
-            QuoteRequest task) {}
+            QuoteRequest task,
+            /* What the task will need, as create will store it. */
+            Requirements requirements) {}
 
     public record CreateResponse(String message, Task task, Pricing pricing, JsonNode idempotency, JsonNode simulation) {}
 
