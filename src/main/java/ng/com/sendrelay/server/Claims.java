@@ -36,7 +36,7 @@ public final class Claims {
         return relay.post(path(taskId), request, null, Claim.class);
     }
 
-    /** Answer Relay's request for more information, while the claim is {@code NEEDS_INFO}. */
+    /** Answer SendRelay's request for more information, while the claim is {@code NEEDS_INFO}. */
     public Claim respond(String taskId, RespondRequest request) {
         return relay.post(path(taskId) + "/respond", request, null, Claim.class);
     }

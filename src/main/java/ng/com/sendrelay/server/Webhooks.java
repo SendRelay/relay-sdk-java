@@ -12,7 +12,7 @@ import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-/** Manage the endpoints Relay sends events to, and check that deliveries came from Relay. */
+/** Manage the endpoints SendRelay sends events to, and check that deliveries came from SendRelay. */
 public final class Webhooks {
     /** How old a delivery may be before {@link #verifySignature} rejects it. */
     public static final Duration DEFAULT_TOLERANCE = Duration.ofSeconds(300);
@@ -51,7 +51,7 @@ public final class Webhooks {
     }
 
     /**
-     * Check that a delivery came from Relay and wasn't changed on the way. Pass the raw request body
+     * Check that a delivery came from SendRelay and wasn't changed on the way. Pass the raw request body
      * exactly as received, the {@code X-Relay-Signature} header and the {@code whsec_} secret.
      */
     public static Verification verifySignature(String payload, String signatureHeader, String secret, Duration tolerance) {

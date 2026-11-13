@@ -240,7 +240,7 @@ public final class Tasks {
             List<String> blockedOrganisations,
             Boolean allowIndependentRiders) {}
 
-    /** Proof of delivery: set {@code code} to choose the digits, or {@code length} (4 or 6) to have Relay generate them. */
+    /** Proof of delivery: set {@code code} to choose the digits, or {@code length} (4 or 6) to have SendRelay generate them. */
     public record CompletionCodeRequest(String code, Integer length) {}
 
     /** Who to call at a stop. */
@@ -255,7 +255,7 @@ public final class Tasks {
     }
 
     /**
-     * When Relay looks for a rider; leave it null for IMMEDIATE. Part of the quote lock. Build it with
+     * When SendRelay looks for a rider; leave it null for IMMEDIATE. Part of the quote lock. Build it with
      * {@link #immediate()}, {@link #waitForRider(int)} or {@link #scheduled(String, Integer)}.
      */
     public record DispatchRequest(
@@ -509,7 +509,7 @@ public final class Tasks {
             Integer completionCodeLength,
             CompletionCode completionCode,
             Rider rider,
-            /* When Relay looks for a rider, and for how long. */
+            /* When SendRelay looks for a rider, and for how long. */
             Dispatch dispatch,
             /* Goes up with every event about the task and matches events' data.revision; 0 before the first. */
             int revision,
@@ -517,11 +517,11 @@ public final class Tasks {
             String currency,
             /* A completion photo is required at every DROPOFF. */
             boolean requirePhoto,
-            /* The vehicles Relay looks for and the equipment a rider on each needs. */
+            /* The vehicles SendRelay looks for and the equipment a rider on each needs. */
             Requirements requirements) {}
 
     /**
-     * What Relay looks for in a rider: each vehicle that can take the task, with the equipment a rider
+     * What SendRelay looks for in a rider: each vehicle that can take the task, with the equipment a rider
      * on it needs (for example a box on a motorcycle for food). Every vehicle is listed when the task
      * names none.
      */

@@ -1,6 +1,6 @@
-# Relay Java SDK
+# SendRelay Java SDK
 
-The official server SDK for [Relay](https://sendrelay.com.ng), the delivery API, for Java and Kotlin. Quote and create deliveries, read them back with the rider's live ETA, manage webhooks, and mint tracking tokens for your apps.
+The official server SDK for [SendRelay](https://sendrelay.com.ng), the delivery API, for Java and Kotlin. Quote and create deliveries, read them back with the rider's live ETA, manage webhooks, and mint tracking tokens for your apps.
 
 ```kotlin
 // build.gradle.kts

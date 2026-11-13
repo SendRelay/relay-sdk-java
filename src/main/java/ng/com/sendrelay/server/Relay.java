@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The Relay server SDK for Java and Kotlin: quote and create deliveries, read them back with the
+ * The SendRelay server SDK for Java and Kotlin: quote and create deliveries, read them back with the
  * rider's live ETA, manage webhooks and mint tracking tokens for your apps. Keep the API key on
  * your server.
  *

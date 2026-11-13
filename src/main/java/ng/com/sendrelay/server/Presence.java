@@ -45,7 +45,7 @@ public final class Presence {
 
     /**
      * A job to count riders for, in the quote's words. Null fields are left out: a null
-     * {@code hasBox} lets Relay decide, and a null item class counts the smallest.
+     * {@code hasBox} lets SendRelay decide, and a null item class counts the smallest.
      */
     public record Filter(
             String taskType,

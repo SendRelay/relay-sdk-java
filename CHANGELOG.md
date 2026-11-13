@@ -2,7 +2,7 @@
 
 ## 1.11.0 — 2026-11-09
 
-- `requirements` on `Tasks.Task`, `Tasks.QuoteResponse` and `Presence.Response` (`Tasks.Requirements`): each vehicle Relay looks for and the equipment a rider on it needs, for example a box on a motorcycle for food. See [the box a task needs](https://docs.sendrelay.com.ng/concepts/dispatch#the-box-a-task-needs). The records gain a last component.
+- `requirements` on `Tasks.Task`, `Tasks.QuoteResponse` and `Presence.Response` (`Tasks.Requirements`): each vehicle SendRelay looks for and the equipment a rider on it needs, for example a box on a motorcycle for food. See [the box a task needs](https://docs.sendrelay.com.ng/concepts/dispatch#the-box-a-task-needs). The records gain a last component.
 - `presence().get(latitude, longitude, resolution, filter)` with a `Presence.Filter` (`Presence.Filter.of("FOOD_DELIVERY")`, or every field: `vehicleType`, `hasBox`, `hasRefrigeration`, `hasAirConditioning`, `estimatedWeight`, `estimatedSize`) counts only riders who could take that job. The three-argument `get` is unchanged.
 
 ## 1.10.0 — 2026-11-08
@@ -26,8 +26,8 @@
 - `Tasks.DispatchRequest` (`immediate()`, `waitForRider(minutes)`, `scheduled(pickupAt, window)`) via `withDispatch` on `QuoteRequest` and `CreateRequest`; the existing constructors still work. `Task.dispatch()` returns the search window.
 - `tasks().simulateAdvance(taskId)` (test keys) starts a booking's search now.
 - `Tasks.Item` takes an optional `reference`, and `Tasks.Location` optional `countryCode` (ISO 3166-1 alpha-2) and `postalCode`; the existing constructors still work. They are returned on the task when sent, and not used in pricing yet.
-- Statuses and webhook event types this version doesn't list arrive as their raw strings. Relay will add task statuses (for example for tasks that keep searching for a rider), so treat a status you don't recognise as still in progress.
+- Statuses and webhook event types this version doesn't list arrive as their raw strings. SendRelay will add task statuses (for example for tasks that keep searching for a rider), so treat a status you don't recognise as still in progress.
 
 ## 1.7.0 — 2026-10-29
 
-- First release, versioned with the other Relay server SDKs (they move together). Matches the shared SDK conformance suite (packages/sdks/conformance).
+- First release, versioned with the other SendRelay server SDKs (they move together). Matches the shared SDK conformance suite (packages/sdks/conformance).

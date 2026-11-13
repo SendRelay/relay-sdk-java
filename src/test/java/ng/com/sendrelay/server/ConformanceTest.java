@@ -32,7 +32,7 @@ import org.junit.jupiter.api.TestFactory;
 
 /**
  * Runs the shared SDK conformance fixtures (packages/sdks/conformance) against this SDK. Every
- * Relay SDK runs the same fixtures, which is how they stay at parity.
+ * SendRelay SDK runs the same fixtures, which is how they stay at parity.
  */
 class ConformanceTest {
     private static final Path DIR = Path.of(System.getenv().getOrDefault("RELAY_CONFORMANCE_DIR", "../conformance"));
