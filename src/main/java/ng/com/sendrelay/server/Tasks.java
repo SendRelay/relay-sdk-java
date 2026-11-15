@@ -296,7 +296,28 @@ public final class Tasks {
         }
     }
 
-    public record QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured) {
+    /**
+     * {@code window} on create and quote, POOLED_DELIVERY only: the wave ("MIDDAY") and, optionally, its
+     * date (YYYY-MM-DD, Lagos). Leave {@code date} null for the next wave still open.
+     */
+    public record PooledWindowRequest(String wave, String date) {
+        /** The next {@code wave} still open for booking. */
+        public static PooledWindowRequest next(String wave) {
+            return new PooledWindowRequest(wave, null);
+        }
+    }
+
+    /**
+     * {@code taskType} POOLED_DELIVERY goes out in a wave on set days of the week, shared with deliveries going the same way:
+     * it needs a {@code window} on create, one PICKUP and one DROPOFF, and no {@code dispatch}. Quote it
+     * without a window to see every upcoming wave. BULK_DELIVERY was renamed POOLED_DELIVERY and is refused.
+     */
+    public record QuoteRequest(
+            String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured, PooledWindowRequest window) {
+        public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured) {
+            this(taskType, priority, stages, preferences, dispatch, insured, null);
+        }
+
         public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch) {
             this(taskType, priority, stages, preferences, dispatch, null);
         }
@@ -311,7 +332,12 @@ public final class Tasks {
 
         /** The same request, with a dispatch strategy. */
         public QuoteRequest withDispatch(DispatchRequest value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, value, insured);
+            return new QuoteRequest(taskType, priority, stages, preferences, value, insured, window);
+        }
+
+        /** The same POOLED_DELIVERY request, quoting one wave instead of every upcoming one. */
+        public QuoteRequest withWindow(PooledWindowRequest value) {
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, insured, value);
         }
 
         /**
@@ -319,7 +345,7 @@ public final class Tasks {
          * default; {@code false} means no premium, and loss or damage is not covered.
          */
         public QuoteRequest withInsured(boolean value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, value);
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, value, window);
         }
     }
 
@@ -338,7 +364,27 @@ public final class Tasks {
             DispatchRequest dispatch,
             Boolean insured,
             /* A completion photo at every DROPOFF; null for the default (no). */
-            Boolean requirePhoto) {
+            Boolean requirePhoto,
+            /* POOLED_DELIVERY only, and required there: the wave to book into. */
+            PooledWindowRequest window) {
+        public CreateRequest(
+                String taskType,
+                String priority,
+                List<Stage> stages,
+                Boolean autoAssign,
+                String paymentMethod,
+                String notes,
+                String externalId,
+                String quoteId,
+                Preferences preferences,
+                CompletionCodeRequest completionCode,
+                String simulationOutcome,
+                DispatchRequest dispatch,
+                Boolean insured,
+                Boolean requirePhoto) {
+            this(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, null);
+        }
+
         public CreateRequest(
                 String taskType,
                 String priority,
@@ -358,7 +404,12 @@ public final class Tasks {
 
         /** The same request, asking for a completion photo at every DROPOFF. */
         public CreateRequest withRequirePhoto(boolean value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, value);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, value, window);
+        }
+
+        /** The same POOLED_DELIVERY request, booked into this wave. */
+        public CreateRequest withWindow(PooledWindowRequest value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, value);
         }
 
         public CreateRequest(
@@ -398,20 +449,21 @@ public final class Tasks {
 
         /** The same request, priced by a quote you got earlier. */
         public CreateRequest withQuoteId(String id) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window);
         }
 
         /**
          * The same request, for a test key: how the simulated delivery plays out (SUCCESS, NO_RIDERS, ...).
-         * SEARCH_THEN_ASSIGNED and SEARCH_EXPIRED need WAIT_FOR_RIDER or SCHEDULED.
+         * SEARCH_THEN_ASSIGNED and SEARCH_EXPIRED need WAIT_FOR_RIDER or SCHEDULED; POOLING_SOLO
+         * (POOLED_DELIVERY only) sends the delivery alone at its maximum price.
          */
         public CreateRequest withSimulationOutcome(String outcome) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured, requirePhoto);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured, requirePhoto, window);
         }
 
         /** The same request, with a dispatch strategy (send the same one you quoted). */
         public CreateRequest withDispatch(DispatchRequest value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value, insured);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value, insured, requirePhoto, window);
         }
 
         /**
@@ -420,7 +472,7 @@ public final class Tasks {
          * value you quoted.
          */
         public CreateRequest withInsured(boolean value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, value);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, value, requirePhoto, window);
         }
     }
 
@@ -518,7 +570,44 @@ public final class Tasks {
             /* A completion photo is required at every DROPOFF. */
             boolean requirePhoto,
             /* The vehicles SendRelay looks for and the equipment a rider on each needs. */
-            Requirements requirements) {}
+            Requirements requirements,
+            /* POOLED_DELIVERY only: its wave and where it stands; null on every other type. */
+            PooledWindow window) {}
+
+    /**
+     * A pooled delivery's wave and where it stands. {@code state} is WAITING, GROUPED (on a shared route)
+     * or SOLO (going alone at its maximum price). {@code sharedWith} counts the other deliveries on its
+     * route, never who they are. {@code stopsBefore}: stops the rider makes before this delivery's next
+     * stop, while that is known.
+     */
+    public record PooledWindow(
+            String wave,
+            String date,
+            String bookBy,
+            String pickupFrom,
+            String pickupTo,
+            String deliverBy,
+            String state,
+            Integer sharedWith,
+            String plannedPickupAt,
+            String plannedDeliveryAt,
+            Integer stopsBefore) {}
+
+    /** A wave's price range for the quoted delivery: at most {@code maxTotal} (held at booking), expected {@code total}. */
+    public record PooledQuotePricing(String kind, long maxTotal, long total, long minTotal) {}
+
+    /** An upcoming wave in a pooled quote. {@code status} is OPEN, or FULL (create refuses it with WAVE_FULL). */
+    public record PooledQuoteWindow(
+            String wave,
+            String date,
+            String status,
+            String bookBy,
+            String pickupFrom,
+            String pickupTo,
+            String deliverBy,
+            PooledQuotePricing pricing,
+            String quoteId,
+            String expiresAt) {}
 
     /**
      * What SendRelay looks for in a rider: each vehicle that can take the task, with the equipment a rider
@@ -599,7 +688,9 @@ public final class Tasks {
             int quoteTtlSeconds,
             QuoteRequest task,
             /* What the task will need, as create will store it. */
-            Requirements requirements) {}
+            Requirements requirements,
+            /* POOLED_DELIVERY: the upcoming waves, each with its own price range and quoteId; null otherwise. */
+            List<PooledQuoteWindow> windows) {}
 
     public record CreateResponse(String message, Task task, Pricing pricing, JsonNode idempotency, JsonNode simulation) {}
 

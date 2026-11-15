@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.0 — 2026-11-15
+
+- Pooled delivery: taskType `POOLED_DELIVERY` and `window` (`PooledWindowRequest`, with `withWindow(...)`) on `CreateRequest` and `QuoteRequest`. A quote without a window returns `windows()` (`PooledQuoteWindow`): each upcoming wave with its status, times, price range and `quoteId`. Pooled tasks carry `window()` (`PooledWindow`) and their pricing lines gain `kind`, `maxTotal`, `minTotal`, `finalTotal` and `finalAt`. The older constructors still work. See [pooled delivery](https://docs.sendrelay.com.ng/concepts/pooled-delivery).
+- `withSimulationOutcome("POOLING_SOLO")` for test pooled deliveries, and the `task.pooling.grouped` and `task.pooling.solo` webhook events.
+- `CreateRequest.withDispatch` and `withInsured` now keep `requirePhoto`.
+- `BULK_DELIVERY` is refused by create and quote (`TASK_TYPE_RENAMED`); older tasks keep it.
+
 ## 1.12.0 — 2026-11-14
 
 - The API no longer accepts `BIKE` as a vehicle type; send `MOTORCYCLE`. A request with `BIKE` now gets a 400, and the presence map no longer returns a `BIKE` count. No code change in the SDK.
