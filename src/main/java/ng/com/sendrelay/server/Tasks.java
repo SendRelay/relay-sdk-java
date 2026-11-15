@@ -97,6 +97,20 @@ public final class Tasks {
         return relay.get("/sdk/tasks/" + Relay.pathId("taskId", taskId), null, GetResponse.class);
     }
 
+    /**
+     * The task with the {@code externalId} you gave it (your order ID), as {@link #get} returns it,
+     * or null if no task in this key's mode has it.
+     */
+    public GetResponse getByExternalId(String externalId) {
+        String path = "/sdk/tasks/by-external-id/" + Relay.pathId("externalId", externalId);
+        try {
+            return relay.get(path, null, GetResponse.class);
+        } catch (ApiException e) {
+            if (e.statusCode() == 404 && "NOT_FOUND".equals(e.code())) return null;
+            throw e;
+        }
+    }
+
     /** Cancel a task that hasn't been picked up. {@code request} may be null. */
     public CancelResponse cancel(String taskId, CancelRequest request) {
         return relay.delete("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/cancel", request, CancelResponse.class);

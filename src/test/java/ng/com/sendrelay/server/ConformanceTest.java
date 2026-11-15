@@ -71,6 +71,7 @@ class ConformanceTest {
             return ids;
         });
         BINDINGS.put("tasks.get", (r, i) -> r.tasks().get(i.get("taskId").asText()));
+        BINDINGS.put("tasks.getByExternalId", (r, i) -> r.tasks().getByExternalId(i.get("externalId").asText()));
         BINDINGS.put("tasks.cancel", (r, i) -> r.tasks().cancel(i.get("taskId").asText(), as(i.get("body"), Tasks.CancelRequest.class)));
         BINDINGS.put("tasks.assign", (r, i) -> r.tasks().assign(i.get("taskId").asText(), as(i.get("body"), Tasks.AssignRequest.class)));
         BINDINGS.put("tasks.availableRiders", (r, i) -> r.tasks().availableRiders(i.get("taskId").asText(), intOrNull(i.path("query").get("tier"))));
@@ -178,7 +179,7 @@ class ConformanceTest {
             }
             JsonNode expected = want.get("request");
             if (!request.method().equals(expected.get("method").asText())) problems.add("method " + request.method());
-            if (!request.uri().getPath().equals(expected.get("path").asText())) problems.add("path " + request.uri().getPath());
+            if (!request.uri().getRawPath().equals(expected.get("path").asText())) problems.add("path " + request.uri().getRawPath());
             Map<String, String> query = new HashMap<>();
             if (request.uri().getRawQuery() != null) {
                 for (String pair : request.uri().getRawQuery().split("&")) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.0 — 2026-11-15
+
+- `tasks().getByExternalId(externalId)`: the task with the `externalId` you gave it at create, as `get` returns it, or null if none has it (`GET /v1/sdk/tasks/by-external-id/{externalId}`). The reference is percent-encoded, so it can hold a slash.
+
 ## 1.13.0 — 2026-11-15
 
 - Pooled delivery: taskType `POOLED_DELIVERY` and `window` (`PooledWindowRequest`, with `withWindow(...)`) on `CreateRequest` and `QuoteRequest`. A quote without a window returns `windows()` (`PooledQuoteWindow`): each upcoming wave with its status, times, price range and `quoteId`. Pooled tasks carry `window()` (`PooledWindow`) and their pricing lines gain `kind`, `maxTotal`, `minTotal`, `finalTotal` and `finalAt`. The older constructors still work. See [pooled delivery](https://docs.sendrelay.com.ng/concepts/pooled-delivery).
