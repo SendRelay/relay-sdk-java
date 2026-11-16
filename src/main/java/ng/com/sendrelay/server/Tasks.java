@@ -146,6 +146,32 @@ public final class Tasks {
         return relay.post("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/simulate/advance", null, null, SimulateAdvanceResponse.class);
     }
 
+    /** The rider's questions on an errand, newest first. Open ones are PENDING. */
+    public Errand.ApprovalList approvals(String taskId) {
+        return relay.get("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/approvals", null, Errand.ApprovalList.class);
+    }
+
+    /**
+     * Answer a question once. The same decision again returns it as it stands; a different one after it
+     * was decided is a 409.
+     */
+    public Errand.Approval decideApproval(String taskId, String approvalId, Errand.ApprovalDecision decision) {
+        String path = "/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/approvals/" + Relay.pathId("approvalId", approvalId);
+        return relay.post(path, decision, null, Errand.Approval.class);
+    }
+
+    /** Drop a work stage the rider has not reached. You are not charged for it. */
+    public Errand.SkipResponse skipStage(String taskId, int stageIndex) {
+        if (stageIndex < 0) throw new ValidationException("stageIndex must be a whole number from 0", "stageIndex");
+        return relay.post("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/stages/" + stageIndex + "/skip", null, null, Errand.SkipResponse.class);
+    }
+
+    /** A 15-minute link to a photo or receipt that a stage's result or an approval names; any other file is a 404 FILE_NOT_FOUND. */
+    public Errand.FileView viewFile(String taskId, String fileUrl) {
+        if (fileUrl == null || fileUrl.isEmpty()) throw new ValidationException("fileUrl is required", "fileUrl");
+        return relay.post("/sdk/tasks/" + Relay.pathId("taskId", taskId) + "/files/view", Map.of("fileUrl", fileUrl), null, Errand.FileView.class);
+    }
+
     // ── Requests ─────────────────────────────────────────────────────────────
 
     /**
@@ -191,6 +217,8 @@ public final class Tasks {
      * here; on create and get, the stop's code), and on responses {@code completionCodeLength},
      * {@code arrivedAt} and {@code waitSeconds}. The nine-argument constructor still works.
      */
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = Errand.StageSerializer.class)
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = Errand.StageDeserializer.class)
     public record Stage(
             String type,
             Location location,
@@ -206,7 +234,28 @@ public final class Tasks {
             StageCompletionCode completionCode,
             Integer completionCodeLength,
             String arrivedAt,
-            Integer waitSeconds) {
+            Integer waitSeconds,
+            /* Errands: the work stage's fields (see Errand.Work), written at the stage's top level. */
+            Errand.Work work) {
+        public Stage(
+                String type,
+                Location location,
+                String instructions,
+                List<Item> items,
+                List<Passenger> passengers,
+                String status,
+                String completedAt,
+                String completionPhoto,
+                String completionNotes,
+                StageContact contact,
+                List<String> deliverItems,
+                StageCompletionCode completionCode,
+                Integer completionCodeLength,
+                String arrivedAt,
+                Integer waitSeconds) {
+            this(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, deliverItems, completionCode, completionCodeLength, arrivedAt, waitSeconds, null);
+        }
+
         public Stage(
                 String type,
                 Location location,
@@ -217,22 +266,27 @@ public final class Tasks {
                 String completedAt,
                 String completionPhoto,
                 String completionNotes) {
-            this(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, null, null, null, null, null, null);
+            this(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, null, null, null, null, null, null, null);
         }
 
         /** The same stop with someone to call there. */
         public Stage withContact(StageContact value) {
-            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, value, deliverItems, completionCode, completionCodeLength, arrivedAt, waitSeconds);
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, value, deliverItems, completionCode, completionCodeLength, arrivedAt, waitSeconds, work);
         }
 
         /** The same DROPOFF, handing over these item references. */
         public Stage withDeliverItems(List<String> value) {
-            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, value, completionCode, completionCodeLength, arrivedAt, waitSeconds);
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, value, completionCode, completionCodeLength, arrivedAt, waitSeconds, work);
         }
 
         /** The same stop, needing a code: {@code new StageCompletionCode("4821", null)} or {@code (null, 4)}. */
         public Stage withCompletionCode(StageCompletionCode value) {
-            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, deliverItems, value, completionCodeLength, arrivedAt, waitSeconds);
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, deliverItems, value, completionCodeLength, arrivedAt, waitSeconds, work);
+        }
+
+        /** The same stop with errand fields: see {@link Errand} for builders of each work stage. */
+        public Stage withWork(Errand.Work value) {
+            return new Stage(type, location, instructions, items, passengers, status, completedAt, completionPhoto, completionNotes, contact, deliverItems, completionCode, completionCodeLength, arrivedAt, waitSeconds, value);
         }
 
         public static Stage pickup(Location location, String instructions, List<Item> items) {
@@ -327,7 +381,22 @@ public final class Tasks {
      * without a window to see every upcoming wave. BULK_DELIVERY was renamed POOLED_DELIVERY and is refused.
      */
     public record QuoteRequest(
-            String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured, PooledWindowRequest window) {
+            String taskType,
+            String priority,
+            List<Stage> stages,
+            Preferences preferences,
+            DispatchRequest dispatch,
+            Boolean insured,
+            PooledWindowRequest window,
+            /* Errands: the most you will pay, in kobo; a maximum above it is a 422 PRICE_LIMIT_EXCEEDED. */
+            Long priceLimit,
+            /* Errands: how long the rider waits for your answer and what happens if nobody answers. */
+            Errand.ApprovalsPolicy approvals) {
+        public QuoteRequest(
+                String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured, PooledWindowRequest window) {
+            this(taskType, priority, stages, preferences, dispatch, insured, window, null, null);
+        }
+
         public QuoteRequest(String taskType, String priority, List<Stage> stages, Preferences preferences, DispatchRequest dispatch, Boolean insured) {
             this(taskType, priority, stages, preferences, dispatch, insured, null);
         }
@@ -346,12 +415,12 @@ public final class Tasks {
 
         /** The same request, with a dispatch strategy. */
         public QuoteRequest withDispatch(DispatchRequest value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, value, insured, window);
+            return new QuoteRequest(taskType, priority, stages, preferences, value, insured, window, priceLimit, approvals);
         }
 
         /** The same POOLED_DELIVERY request, quoting one wave instead of every upcoming one. */
         public QuoteRequest withWindow(PooledWindowRequest value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, insured, value);
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, insured, value, priceLimit, approvals);
         }
 
         /**
@@ -359,7 +428,17 @@ public final class Tasks {
          * default; {@code false} means no premium, and loss or damage is not covered.
          */
         public QuoteRequest withInsured(boolean value) {
-            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, value, window);
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, value, window, priceLimit, approvals);
+        }
+
+        /** The same errand, refused (422 PRICE_LIMIT_EXCEEDED) if the most it can cost is above this, in kobo. */
+        public QuoteRequest withPriceLimit(long value) {
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, insured, window, value, approvals);
+        }
+
+        /** The same errand, with how long the rider waits for your answer and what happens if nobody answers. */
+        public QuoteRequest withApprovals(Errand.ApprovalsPolicy value) {
+            return new QuoteRequest(taskType, priority, stages, preferences, dispatch, insured, window, priceLimit, value);
         }
     }
 
@@ -380,7 +459,30 @@ public final class Tasks {
             /* A completion photo at every DROPOFF; null for the default (no). */
             Boolean requirePhoto,
             /* POOLED_DELIVERY only, and required there: the wave to book into. */
-            PooledWindowRequest window) {
+            PooledWindowRequest window,
+            /* Errands: the most you will pay, in kobo; a maximum above it is a 422 PRICE_LIMIT_EXCEEDED. */
+            Long priceLimit,
+            /* Errands: how long the rider waits for your answer and what happens if nobody answers. */
+            Errand.ApprovalsPolicy approvals) {
+        public CreateRequest(
+                String taskType,
+                String priority,
+                List<Stage> stages,
+                Boolean autoAssign,
+                String paymentMethod,
+                String notes,
+                String externalId,
+                String quoteId,
+                Preferences preferences,
+                CompletionCodeRequest completionCode,
+                String simulationOutcome,
+                DispatchRequest dispatch,
+                Boolean insured,
+                Boolean requirePhoto,
+                PooledWindowRequest window) {
+            this(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window, null, null);
+        }
+
         public CreateRequest(
                 String taskType,
                 String priority,
@@ -418,12 +520,12 @@ public final class Tasks {
 
         /** The same request, asking for a completion photo at every DROPOFF. */
         public CreateRequest withRequirePhoto(boolean value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, value, window);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, value, window, priceLimit, approvals);
         }
 
         /** The same POOLED_DELIVERY request, booked into this wave. */
         public CreateRequest withWindow(PooledWindowRequest value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, value);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, value, priceLimit, approvals);
         }
 
         public CreateRequest(
@@ -461,9 +563,19 @@ public final class Tasks {
             this(taskType, null, stages, null, null, null, null, null, null, null, null, null, null);
         }
 
+        /** The same errand, refused (422 PRICE_LIMIT_EXCEEDED) if the most it can cost is above this, in kobo. */
+        public CreateRequest withPriceLimit(long value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window, value, approvals);
+        }
+
+        /** The same errand, with how long the rider waits for your answer and what happens if nobody answers. */
+        public CreateRequest withApprovals(Errand.ApprovalsPolicy value) {
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window, priceLimit, value);
+        }
+
         /** The same request, priced by a quote you got earlier. */
         public CreateRequest withQuoteId(String id) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, id, preferences, completionCode, simulationOutcome, dispatch, insured, requirePhoto, window, priceLimit, approvals);
         }
 
         /**
@@ -472,12 +584,12 @@ public final class Tasks {
          * (POOLED_DELIVERY only) sends the delivery alone at its maximum price.
          */
         public CreateRequest withSimulationOutcome(String outcome) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured, requirePhoto, window);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, outcome, dispatch, insured, requirePhoto, window, priceLimit, approvals);
         }
 
         /** The same request, with a dispatch strategy (send the same one you quoted). */
         public CreateRequest withDispatch(DispatchRequest value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value, insured, requirePhoto, window);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, value, insured, requirePhoto, window, priceLimit, approvals);
         }
 
         /**
@@ -486,7 +598,7 @@ public final class Tasks {
          * value you quoted.
          */
         public CreateRequest withInsured(boolean value) {
-            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, value, requirePhoto, window);
+            return new CreateRequest(taskType, priority, stages, autoAssign, paymentMethod, notes, externalId, quoteId, preferences, completionCode, simulationOutcome, dispatch, value, requirePhoto, window, priceLimit, approvals);
         }
     }
 
@@ -586,7 +698,11 @@ public final class Tasks {
             /* The vehicles SendRelay looks for and the equipment a rider on each needs. */
             Requirements requirements,
             /* POOLED_DELIVERY only: its wave and where it stands; null on every other type. */
-            PooledWindow window) {}
+            PooledWindow window,
+            /* Errands with work stages: how far it got. pricing then also has service, spend, soFar and the final bill. */
+            Errand.Summary errand,
+            Errand.ApprovalsPolicy approvals,
+            Long priceLimit) {}
 
     /**
      * A pooled delivery's wave and where it stands. {@code state} is WAITING, GROUPED (on a shared route)
@@ -704,9 +820,25 @@ public final class Tasks {
             /* What the task will need, as create will store it. */
             Requirements requirements,
             /* POOLED_DELIVERY: the upcoming waves, each with its own price range and quoteId; null otherwise. */
-            List<PooledQuoteWindow> windows) {}
+            List<PooledQuoteWindow> windows,
+            /* Errands with work stages: total is the most it can cost; pricing is the range. */
+            Errand.QuotePricing pricing,
+            Errand.Schedule schedule,
+            List<Errand.Warning> warnings,
+            List<Stage> stages,
+            Errand.ApprovalsPolicy approvals) {}
 
-    public record CreateResponse(String message, Task task, Pricing pricing, JsonNode idempotency, JsonNode simulation) {}
+    public record CreateResponse(
+            String message,
+            Task task,
+            Pricing pricing,
+            JsonNode idempotency,
+            JsonNode simulation,
+            /* Errands with work stages: the range held, when each stop is expected, anything worth a look. */
+            Errand.QuotePricing errand,
+            Errand.Schedule schedule,
+            List<Errand.Warning> warnings,
+            Errand.ApprovalsPolicy approvals) {}
 
     public record TaskListItem(
             String id,
@@ -735,11 +867,24 @@ public final class Tasks {
     /** What {@link #update} may change. {@code contact} null on a stage leaves it unchanged. */
     public record UpdateRequest(String notes, String externalId, List<UpdateStage> stages) {}
 
-    public record UpdateStage(int index, String instructions, StageContact contact) {}
+    /**
+     * One stop to change. On an errand, {@code items} (a PURCHASE's list) and {@code questions} change
+     * until the rider reaches the stop; a change that moves the price is a 422 EDIT_MOVES_PRICE.
+     */
+    public record UpdateStage(int index, String instructions, StageContact contact, List<Errand.PurchaseItem> items, List<Errand.Question> questions) {
+        public UpdateStage(int index, String instructions, StageContact contact) {
+            this(index, instructions, contact, null, null);
+        }
+    }
 
     public record UpdateResponse(Task task) {}
 
-    public record TrackingLinkRequest(Integer stageIndex) {}
+    /** {@code canAnswer} (errands): the page may answer the rider's questions that fit inside the held maximum. */
+    public record TrackingLinkRequest(Integer stageIndex, Boolean canAnswer) {
+        public TrackingLinkRequest(Integer stageIndex) {
+            this(stageIndex, null);
+        }
+    }
 
     public record TrackingLinkResponse(String url, String expiresAt, Integer stageIndex) {}
 

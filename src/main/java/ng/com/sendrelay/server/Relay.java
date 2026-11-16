@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 public final class Relay {
     /** The published SDK version. Kept in sync with gradle.properties by scripts/check-sdk-versions.mjs. */
-    public static final String VERSION = "1.14.0";
+    public static final String VERSION = "1.15.0";
 
     public static final String DEFAULT_BASE_URL = "https://api.sendrelay.com.ng";
     public static final String DEFAULT_API_VERSION = "v1";
@@ -65,6 +65,7 @@ public final class Relay {
     private final Presence presence = new Presence(this);
     private final Events events = new Events(this);
     private final Claims claims = new Claims(this);
+    private final Errands errands = new Errands(this);
 
     private Relay(Builder b) {
         this.apiKey = b.apiKey;
@@ -106,6 +107,11 @@ public final class Relay {
     /** Insurance claims on a task, for insured goods lost, stolen or damaged after collection. */
     public Claims claims() {
         return claims;
+    }
+
+    /** The errand price list and limits. Build errand stages with {@link Errand}. */
+    public Errands errands() {
+        return errands;
     }
 
     /** {@code "live"} for a live key, {@code "test"} for a test key. */

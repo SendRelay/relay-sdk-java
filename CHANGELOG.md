@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.0 — 2026-11-16
+
+- Errands with work stages: `taskType` ERRAND takes the stage types PURCHASE, PAYMENT, QUEUE, INSPECTION and CUSTOM beside PICKUP and DROPOFF. A stage's errand fields are `Stage.work()` (`Errand.Work`), written at the stage's top level; `Errand.queue`, `purchase`, `payment`, `inspection`, `custom`, `pickup` and `dropoff` build stages, and `Errand.work().with...()` adds fields. See [errands](https://docs.sendrelay.com.ng/errands).
+- `withPriceLimit` and `withApprovals` on `CreateRequest` and `QuoteRequest`. An errand `QuoteResponse` has `pricing`, `schedule`, `warnings` and `stages`; `CreateResponse` gains `errand`, `schedule`, `warnings` and `approvals`; `Task` gains `errand`, `approvals` and `priceLimit`.
+- `errands().options()`, `tasks().approvals(taskId)`, `tasks().decideApproval(taskId, approvalId, decision)`, `tasks().skipStage(taskId, stageIndex)` and `tasks().viewFile(taskId, fileUrl)`. `UpdateStage` takes `items` and `questions`; `TrackingLinkRequest` takes `canAnswer`. The older constructors keep working.
+- Other task types are unchanged.
+
 ## 1.14.0 — 2026-11-15
 
 - `tasks().getByExternalId(externalId)`: the task with the `externalId` you gave it at create, as `get` returns it, or null if none has it (`GET /v1/sdk/tasks/by-external-id/{externalId}`). The reference is percent-encoded, so it can hold a slash.

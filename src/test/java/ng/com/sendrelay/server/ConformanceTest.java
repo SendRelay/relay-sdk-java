@@ -118,6 +118,11 @@ class ConformanceTest {
         BINDINGS.put("claims.file", (r, i) -> r.claims().file(i.get("taskId").asText(), as(i.get("body"), Claims.FileRequest.class)));
         BINDINGS.put("claims.respond", (r, i) -> r.claims().respond(i.get("taskId").asText(), as(i.get("body"), Claims.RespondRequest.class)));
         BINDINGS.put("claims.withdraw", (r, i) -> r.claims().withdraw(i.get("taskId").asText()));
+        BINDINGS.put("errands.options", (r, i) -> r.errands().options());
+        BINDINGS.put("tasks.approvals", (r, i) -> r.tasks().approvals(i.get("taskId").asText()));
+        BINDINGS.put("tasks.decideApproval", (r, i) -> r.tasks().decideApproval(i.get("taskId").asText(), i.get("approvalId").asText(), as(i.get("body"), Errand.ApprovalDecision.class)));
+        BINDINGS.put("tasks.skipStage", (r, i) -> r.tasks().skipStage(i.get("taskId").asText(), i.get("stageIndex").asInt()));
+        BINDINGS.put("tasks.viewFile", (r, i) -> r.tasks().viewFile(i.get("taskId").asText(), i.get("fileUrl").asText()));
     }
 
     private static Events.ListParams eventParams(JsonNode q) {
